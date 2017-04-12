@@ -1,3 +1,11 @@
+*.~undo-tree~
+*~
+*#
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+
 # Object files
 *.o
 *.ko
