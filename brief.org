@@ -1,0 +1,223 @@
+#+TITLE: libev代码注释
+#+AUTHOR: sqlfocus
+
+
+本系列文档注解libev，了解其运行机理，以期更好的把握框架应用！
+
+* ev_io
+IO事件，监控文件描述符(本地文件除外)是否可读写；使用epoll的level-triggering
+模式。
+ #+BEGIN_EXAMPLE
+ ev_io stdin_watcher;
+ static void my_cb (EV_P_ ev_io *w, int revents){}
+ ev_init (&stdin_watcher, my_cb);
+ ev_io_set (&stdin_watcher, STDIN_FILENO, EV_READ);
+ ev_io_init (&stdin_watcher, my_cb, STDIN_FILENO, EV_READ);
+ ev_io_start (EV_A_ &stdin_watcher);
+ ev_io_stop (EV_A_ &stdin_watcher);
+ #+END_EXAMPLE
+
+* ev_timer
+定时器，可用于定时或周期性定时事件；由于利用系统realtime，不受系统时间重
+置等操作的影响。
+
+回调函数将在设定的时间之后被调用，提供低精度时钟的设备，可能会有些许延迟
+误差。
+ #+BEGIN_EXAMPLE
+ ev_timer timer;
+
+ 循环定时器
+ ev_timer_init (timer, callback, 60., 1.);   /* 60s后启动，后续1s周期执行 */
+ ev_timer_start (EV_A_  timer);
+ ev_timer_stop (EV_A_  timer);
+
+ 包触发的超时定时器1
+ ev_timer_init (timer, callback, 60., 0.);   /* 60s内等待数据包 */
+ ev_timer_start (EV_A_  timer);
+ ev_timer_stop (EV_A_  timer);               /* 数据包到来，停止并重启定时器 */
+ ev_timer_set (timer, 60., 0.);
+ ev_timer_start (EV_A_  timer);
+
+ 包触发的超时定时器2
+ ev_timer_init (timer, callback, 60., 0.);   /* 启动定时器 */
+ ev_timer_again (EV_A_  timer);
+
+ timer->repeat = 30.;                        /* 数据包到来后，重启定时器；可设置新等待时间 */
+ ev_timer_again (EV_A_ timer);
+ #+END_EXAMPLE
+
+* ev_idle
+事件循环中无注册事件时，被调用。
+ #+BEGIN_EXAMPLE
+ ev_idle idle;
+
+ static void idle_cb (EV_P_ ev_idle *w, int revents){}
+ ev_idle_init (&idle, idle_cb);
+ ev_idle_start (EV_A_ &idle);
+ ev_idle_stop (EV_A_ &idle);
+ #+END_EXAMPLE
+
+* ev_run()
+事件循环执行入口，此函数开启了所在进程的事件驱动。
+
+* 事件循环类型
+libev支持两种事件循环，默认、动态分配
+ - ev_break()                         :: 跳出事件循环
+ - ev_default_loop()/EV_DEFAULT       :: 默认事件循环，libev框架静态分配
+    : 非线程安全
+    : 能处理SIGCHLD信号
+    : 不需销毁
+ - ev_loop_new()                      :: 动态分配
+    : 线程安全
+    : 不能处理SIGCHLD信号
+    : 通过ev_loop_destroy()销毁
+
+libev支持多种事件类型(回调函数的revents)，如下
+ - EV_READ         :: for ev_io
+ - EV_WRITE        :: for ev_io
+ - EV_TIMER        :: for ev_timer
+ - EV_PERIODIC     :: for ev_periodic
+ - EV_SIGNAL       :: for ev_signal
+ - EV_CHILD        :: for ev_child
+ - EV_STAT         :: for ev_stat
+ - EV_IDLE         :: for ev_idle
+ - EV_PREPARE      :: for ev_prepare
+ - EV_CHECK        :: for ev_check
+ - EV_ERROR        :: unspecified error has occurred, 如监听链路关闭
+
+* 优先级模型
+libev支持静态优先级，可通过ev_set_priority()设置事件优先级: 在一次事件处理循
+环中，优先处理高优先级事件、随后处理低优先级事件，所有事件处理完毕后，再开启
+一次新的事件循环(only-for-ordering model uses priorities solely to order 
+callback invocation within a single event loop iteration: Higher priority 
+watchers are invoked before lower priority ones, but they all get invoked 
+before polling for new events)
+
+idle watchers use the "lock-out" model, meaning that idle watchers will only
+be executed when no same or higher priority watchers have received events, 
+they can be used to implement the "lock-out" model when required. 
+利用libev内置的IDLE事件观测器可以实现"lock-out"模型：一次事件处理循环中，所有
+其他事件观测器空闲时才调用idle观测器。
+
+优先级取值范围EV_MINPRI(-2)/EV_MAXPRI(2)，默认值0, 通过以下函数设置优先级：
+ - ev_set_priority()        :: 设置优先级
+ - ev_priority()            :: 获取优先级
+
+* 函数
+ - ev_feed_signal()       :: 模拟接收到信号
+ - ev_now()               :: 返回缓存的时间戳
+ - ev_run()               :: 启动事件循环
+ - ev_sleep()             :: 阻塞睡眠等待，可被中断
+    : 全局函数
+ - ev_suspend/ev_resume() :: 挂起/恢复事件循环，停止处理消息及定时器
+ - ev_time()              :: 获取时间戳，通过getimeofday实现，速度慢(ev_now()快)
+    : 全局函数，随时随地可调，即使在初始化前
+
+* 错误处理
+libev支持三类错误，系统错误、使用错误、内部错误(bugs)
+ - 不能处理的系统错误将调用通过ev_set_syserr_cb()设置的回调
+ - 使用错误，则由assert()触发日志，并调用abort()退出
+ - 内部错误，通过内部check机制处理。
+
+ #+BEGIN_EXAMPLE
+ 系统错误的处理流程
+ -ev_syserr()
+   -syserr_cb()          由ev_set_syserr_cb()设置
+   -默认abort()
+ #+END_EXAMPLE
+
+* 简单示例
+ #+BEGIN_EXAMPLE
+ 编译libev
+ $ cd ${libev}
+ $ ./configure
+ $ make
+ $ cp .libs/libev.a ${示例代码目录}
+ $ cp ev.h ${示例代码目录}
+ #+END_EXAMPLE
+
+ #+BEGIN_EXAMPLE
+ 编译代码
+ $ gcc main.c libev.a -lm -L./
+ $ ./a.out
+ #+END_EXAMPLE
+
+ #+BEGIN_EXAMPLE
+   #include <stdio.h>
+   #include "ev.h"
+
+   // every watcher type has its own typedef'd struct
+   // with the name ev_TYPE
+   ev_io stdin_watcher;
+   ev_timer timeout_watcher;
+
+   // all watcher callbacks have a similar signature
+   // this callback is called when data is readable on stdin
+   static void
+   stdin_cb (EV_P_ ev_io *w, int revents)
+   {
+     puts ("stdin ready");
+     // for one-shot events, one must manually stop the watcher
+     // with its corresponding stop function.
+     ev_io_stop (EV_A_ w);
+
+     // this causes all nested ev_run's to stop iterating
+     ev_break (EV_A_ EVBREAK_ALL);
+   }
+
+   // another callback, this time for a time-out
+   static void
+   timeout_cb (EV_P_ ev_timer *w, int revents)
+   {
+     puts ("timeout");
+     // this causes the innermost ev_run to stop iterating
+     ev_break (EV_A_ EVBREAK_ONE);
+   }
+
+   int
+   main (void)
+   {
+     // use the default event loop unless you have special needs
+     struct ev_loop *loop = EV_DEFAULT;
+
+     // initialise an io watcher, then start it
+     // this one will watch for stdin to become readable
+     ev_io_init (&stdin_watcher, stdin_cb, /*STDIN_FILENO*/ 0, EV_READ);
+     ev_io_start (loop, &stdin_watcher);
+
+     // initialise a timer watcher, then start it
+     // simple non-repeating 5.5 second timeout
+     ev_timer_init (&timeout_watcher, timeout_cb, 5.5, 0.);
+     ev_timer_start (loop, &timeout_watcher);
+
+     // now wait for events to arrive
+     ev_run (loop, 0);
+
+     // break was called, so exit
+     return 0;
+   }
+ #+END_EXAMPLE
+
+* 注意事项
+ - 事件观测器(如ev_io)尽量动态分配
+ - ev_TYPE_init()=ev_init()+ev_TYPE_set()
+ - 事件观测器启动后(调用ev_TYPE_start())，停止前(ev_TYPE_stop())，不能改动其内容(ev_TYPE_set())
+ - 事件观测器启动后，停止前，不能修改其优先级
+
+* 参考
+ - [[software.schmorp.de/pkg/libev.html][官网]]
+ - ~/ev.pod
+
+
+
+
+
+
+
+
+
+
+
+
+
+

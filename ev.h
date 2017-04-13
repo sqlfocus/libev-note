@@ -534,7 +534,9 @@ EV_API_DECL unsigned int ev_supported_backends (void) EV_THROW;
 EV_API_DECL unsigned int ev_recommended_backends (void) EV_THROW;
 EV_API_DECL unsigned int ev_embeddable_backends (void) EV_THROW;
 
+/* 全局函数(随时可调用)：返回时间戳，通过gettimeofday实现 */
 EV_API_DECL ev_tstamp ev_time (void) EV_THROW;
+/* 全局函数：睡眠等待，通过nanosleep/select实现 */
 EV_API_DECL void ev_sleep (ev_tstamp delay) EV_THROW; /* sleep for a while */
 
 /* Sets the allocation function to use, works like realloc.
@@ -548,7 +550,7 @@ EV_API_DECL void ev_set_allocator (void *(*cb)(void *ptr, long size) EV_THROW) E
 /* set the callback function to call on a
  * retryable syscall error
  * (such as failed select, poll, epoll_wait)
- */
+ *//* 设置系统错误的处理回调 */
 EV_API_DECL void ev_set_syserr_cb (void (*cb)(const char *msg) EV_THROW) EV_THROW;
 
 #if EV_MULTIPLICITY
@@ -578,6 +580,7 @@ ev_is_default_loop (EV_P) EV_THROW
 /* create and destroy alternative loops that don't handle signals */
 EV_API_DECL struct ev_loop *ev_loop_new (unsigned int flags EV_CPP (= 0)) EV_THROW;
 
+/* 返回当前时间戳；通过缓存，速度快；但必须在libev事件循环初始化启动后才可使用 */
 EV_API_DECL ev_tstamp ev_now (EV_P) EV_THROW; /* time w.r.t. timers and the eventloop, updated after each poll */
 
 #else
@@ -752,6 +755,7 @@ EV_API_DECL void ev_resume  (EV_P) EV_THROW;
 EV_API_DECL void ev_feed_event     (EV_P_ void *w, int revents) EV_THROW;
 EV_API_DECL void ev_feed_fd_event  (EV_P_ int fd, int revents) EV_THROW;
 #if EV_SIGNAL_ENABLE
+/* 模拟接收到某信号 */
 EV_API_DECL void ev_feed_signal    (int signum) EV_THROW;
 EV_API_DECL void ev_feed_signal_event (EV_P_ int signum) EV_THROW;
 #endif
